@@ -3,50 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GenieSuite AI | Enterprise Assistant</title>
+    <meta name="description" content="GenieSuite AI - Your intelligent business strategy assistant">
+    <title>GenieSuite AI | Chat Assistant</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body>
-    <div class="app-container">
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fa-solid fa-brain"></i> GenieSuite
-            </div>
-            <nav>
-                <div class="nav-item active"><i class="fa-solid fa-message"></i> Agent Chat</div>
-                <div class="nav-item"><i class="fa-solid fa-file-lines"></i> Reports</div>
-                <div class="nav-item"><i class="fa-solid fa-chart-pie"></i> Analytics</div>
-            </nav>
-            <div class="status-indicator">
-                <span class="dot"></span> System Online
-            </div>
-        </aside>
-
-        <main class="chat-interface">
-            <header>
-                <h2><i class="fa-solid fa-wand-magic-sparkles"></i> Strategy Orchestrator</h2>
-                <div class="audio-visualizer" id="visualizer">
-                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-                </div>
-            </header>
-
-            <div class="chat-history" id="chatHistory">
-                <div class="message bot">
-                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
-                    <div class="content">
-                        Hello. I am GenieSuite. State your business goal and industry to begin the pipeline.
+<body class="chatbot-theme">
+    <!-- Background -->
+    <div class="bg-gradient"></div>
+    
+    <div class="chatbot-container">
+        <!-- Chat Area -->
+        <div class="chat-area" id="chatArea">
+            <!-- Welcome Screen -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <div class="welcome-icon">
+                        <i class="fa-solid fa-sparkles"></i>
                     </div>
+                    <h1 class="welcome-title">What can I help with?</h1>
+                    <p class="welcome-subtitle">I'm GenieSuite AI, your business strategy assistant. Ask me anything about your business goals.</p>
                 </div>
             </div>
 
-            <div class="input-area">
-                <button id="voiceBtn" class="icon-btn"><i class="fa-solid fa-microphone"></i></button>
-                <input type="text" id="userInput" placeholder="E.g., 'Scale my coffee shop brand in Seattle'...">
-                <button id="sendBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            <!-- Chat Messages -->
+            <div class="messages-container" id="messagesContainer">
+                <!-- Messages will be inserted here -->
             </div>
-        </main>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <button class="input-icon-btn attach-btn" id="attachBtn" title="Attach File">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+                <input 
+                    type="text" 
+                    id="userInput" 
+                    placeholder="Ask anything"
+                    autocomplete="off"
+                >
+                <button class="input-icon-btn voice-btn" id="voiceBtn" title="Voice Input">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+                <button class="send-btn" id="sendBtn" title="Send Message">
+                    <i class="fa-solid fa-arrow-up"></i>
+                </button>
+            </div>
+            
+            <!-- Quick Options -->
+            <div class="quick-options" id="quickOptions">
+                <button class="option-chip" data-example="Scale my coffee shop brand in Seattle">
+                    <i class="fa-solid fa-coffee"></i>
+                    <span>Retail Business</span>
+                </button>
+                <button class="option-chip" data-example="Launch a SaaS product for small businesses">
+                    <i class="fa-solid fa-cloud"></i>
+                    <span>Tech Startup</span>
+                </button>
+                <button class="option-chip" data-example="Expand my consulting firm to new markets">
+                    <i class="fa-solid fa-briefcase"></i>
+                    <span>Consulting</span>
+                </button>
+                <button class="option-chip" data-example="Improve customer retention for my e-commerce store">
+                    <i class="fa-solid fa-store"></i>
+                    <span>E-commerce</span>
+                </button>
+                <button class="option-chip" data-example="Create a marketing strategy for my new product">
+                    <i class="fa-solid fa-bullhorn"></i>
+                    <span>Marketing</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Processing your request...</p>
+        </div>
     </div>
 
     <script src="app.js"></script>
