@@ -9,6 +9,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import logging
+from langchain_groq import ChatGroq
 
 load_dotenv()
 
@@ -32,112 +33,41 @@ class GenieEngine:
     def __init__(self):
         self.groq_key = os.getenv("GROQ_API_KEY")
         self.tavily_key = os.getenv("TAVILY_API_KEY")
-        self.openai_key = os.getenv("OPENAI_API_KEY")
-        self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         
-        # Fallback LLM provider priority
-        self.llm_provider = self._detect_llm_provider()
-        
-    def _detect_llm_provider(self) -> str:
-        """Detect which LLM provider is available"""
+        # Initialize LangChain with Groq
         if self.groq_key:
-            return "groq"
-        elif self.openai_key:
-            return "openai"
-        elif self.anthropic_key:
-            return "anthropic"
+            self.llm = ChatGroq(
+                model="mixtral-8x7b-32768",
+                groq_api_key=self.groq_key,
+                temperature=0.7,
+                max_tokens=2000
+            )
         else:
-            logger.warning("No LLM API key found. Using fallback mode.")
-            return "fallback"
+            logger.warning("GROQ_API_KEY not found. Using fallback mode.")
+            self.llm = None
     
     def _llm_generate(self, prompt: str, model: Optional[str] = None, temperature: float = 0.7) -> str:
-        """Secure Server-Side LLM Call with multiple provider support"""
+        """Secure Server-Side LLM Call using LangChain with Groq"""
         
-        if self.llm_provider == "groq" and self.groq_key:
-            return self._call_groq(prompt, model or "mixtral-8x7b-32768", temperature)
-        elif self.llm_provider == "openai" and self.openai_key:
-            return self._call_openai(prompt, model or "gpt-3.5-turbo", temperature)
-        elif self.llm_provider == "anthropic" and self.anthropic_key:
-            return self._call_anthropic(prompt, model or "claude-3-sonnet-20240229", temperature)
-        else:
-            # Fallback mode - return a template response
+        if self.llm is None:
             return self._fallback_response(prompt)
-    
-    def _call_groq(self, prompt: str, model: str, temperature: float) -> str:
-        """Call Groq API"""
+        
         try:
-            headers = {
-                "Authorization": f"Bearer {self.groq_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "max_tokens": 2000
-            }
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=payload,
-                headers=headers,
-                timeout=30
+            # Create a new LLM instance with the requested temperature
+            llm = ChatGroq(
+                model=model or "moonshotai/kimi-k2-instruct",
+                groq_api_key=self.groq_key,
+                temperature=temperature,
+                max_tokens=2000
             )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            
+            # Use LangChain to generate response
+            response = llm.invoke(prompt)
+            return response.content
         except Exception as e:
-            logger.error(f"Groq API error: {str(e)}")
+            logger.error(f"LangChain Groq API error: {str(e)}")
             return f"Error generating response: {str(e)}"
     
-    def _call_openai(self, prompt: str, model: str, temperature: float) -> str:
-        """Call OpenAI API"""
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.openai_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "max_tokens": 2000
-            }
-            resp = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                json=payload,
-                headers=headers,
-                timeout=30
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
-        except Exception as e:
-            logger.error(f"OpenAI API error: {str(e)}")
-            return f"Error generating response: {str(e)}"
-    
-    def _call_anthropic(self, prompt: str, model: str, temperature: float) -> str:
-        """Call Anthropic API"""
-        try:
-            headers = {
-                "x-api-key": self.anthropic_key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": model,
-                "max_tokens": 2000,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature
-            }
-            resp = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                json=payload,
-                headers=headers,
-                timeout=30
-            )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"]
-        except Exception as e:
-            logger.error(f"Anthropic API error: {str(e)}")
-            return f"Error generating response: {str(e)}"
     
     def _fallback_response(self, prompt: str) -> str:
         """Fallback response when no API keys are available"""

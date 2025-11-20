@@ -6,3 +6,5 @@ requests>=2.31.0
 python-docx>=0.8.11
 beautifulsoup4>=4.12.0
 python-multipart
+langchain>=0.1.0
+langchain-groq>=0.0.1
