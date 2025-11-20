@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenieSuite AI | Enterprise Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-brain"></i> GenieSuite
+            </div>
+            <nav>
+                <div class="nav-item active"><i class="fa-solid fa-message"></i> Agent Chat</div>
+                <div class="nav-item"><i class="fa-solid fa-file-lines"></i> Reports</div>
+                <div class="nav-item"><i class="fa-solid fa-chart-pie"></i> Analytics</div>
+            </nav>
+            <div class="status-indicator">
+                <span class="dot"></span> System Online
+            </div>
+        </aside>
+
+        <main class="chat-interface">
+            <header>
+                <h2><i class="fa-solid fa-wand-magic-sparkles"></i> Strategy Orchestrator</h2>
+                <div class="audio-visualizer" id="visualizer">
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                </div>
+            </header>
+
+            <div class="chat-history" id="chatHistory">
+                <div class="message bot">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="content">
+                        Hello. I am GenieSuite. State your business goal and industry to begin the pipeline.
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <button id="voiceBtn" class="icon-btn"><i class="fa-solid fa-microphone"></i></button>
+                <input type="text" id="userInput" placeholder="E.g., 'Scale my coffee shop brand in Seattle'...">
+                <button id="sendBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
