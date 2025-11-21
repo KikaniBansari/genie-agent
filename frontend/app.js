@@ -285,25 +285,29 @@ function extractIndustry(text) {
 
 // Voice Output
 function speak(text) {
-    if (!state.voiceEnabled || synthesis.speaking) return;
+    if (!state.voiceEnabled || synthesis.speaking) return null;
     
-    const cleanText = text.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '');
+    const cleanText = text.replace(/<[^>]*>?/gm, '').replace(/\*\*/g, '').replace(/\[.*?\]\(.*?\)/g, ''); // Remove markdown links
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = 0.9;
     utterance.pitch = 1;
     utterance.volume = 0.8;
     
     utterance.onstart = () => {
+        voiceBtn.classList.add('speaking');
         // Visual feedback can be added here
     };
     utterance.onend = () => {
+        voiceBtn.classList.remove('speaking');
         // Visual feedback can be removed here
     };
     utterance.onerror = () => {
+        voiceBtn.classList.remove('speaking');
         // Handle error
     };
     
     synthesis.speak(utterance);
+    return utterance; // Return utterance so caller can attach events
 }
 
 // Toast Notifications

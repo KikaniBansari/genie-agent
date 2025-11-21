@@ -68,7 +68,6 @@ class GenieEngine:
             logger.error(f"LangChain Groq API error: {str(e)}")
             return f"Error generating response: {str(e)}"
     
-    
     def _fallback_response(self, prompt: str) -> str:
         """Fallback response when no API keys are available"""
         if "strategy" in prompt.lower():
@@ -300,3 +299,165 @@ List 5-7 concrete action items in a numbered list format. Each item should be sp
         except Exception as e:
             logger.error(f"Error generating document: {str(e)}")
             raise Exception(f"Failed to generate document: {str(e)}")
+
+
+class MemoryStore:
+    """Simple JSON file-based memory store for conversational state."""
+    def __init__(self, path: str = "agent_memory.json"):
+        self.path = path
+        # initialize file
+        if not os.path.exists(self.path):
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump({}, f)
+
+    def _read(self) -> Dict[str, Any]:
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _write(self, data: Dict[str, Any]):
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+    def get_session(self, session_id: str) -> Dict[str, Any]:
+        data = self._read()
+        return data.get(session_id, {"history": []})
+
+    def append_message(self, session_id: str, role: str, content: str):
+        data = self._read()
+        session = data.setdefault(session_id, {"history": []})
+        session["history"].append({"role": role, "content": content, "ts": datetime.now().isoformat()})
+        self._write(data)
+
+    def clear_session(self, session_id: str):
+        data = self._read()
+        if session_id in data:
+            del data[session_id]
+            self._write(data)
+
+
+class Agent:
+    """Higher level agent built on top of GenieEngine that supports conversational patterns,
+    intent parsing, action handlers and memory.
+    """
+    def __init__(self, engine: GenieEngine, memory_path: str = "agent_memory.json"):
+        self.engine = engine
+        self.memory = MemoryStore(memory_path)
+
+    def parse_intent(self, message: str) -> Dict[str, Any]:
+        """Basic intent parser. Uses keyword matching and falls back to LLM if available."""
+        text = message.lower()
+        # simple keyword intents
+        if any(k in text for k in ["summarize", "summary", "summarise", "sum up"]):
+            return {"intent": "summarize"}
+        if any(k in text for k in ["plan", "strategy", "roadmap"]):
+            return {"intent": "plan"}
+        if any(k in text for k in ["todo", "action items", "tasks"]):
+            return {"intent": "todo"}
+        if any(k in text for k in ["search", "research", "find"]):
+            return {"intent": "search"}
+        if any(k in text for k in ["generate doc", "export", "document"]):
+            return {"intent": "generate_doc"}
+
+        # fallback: ask LLM for intent (if available)
+        if self.engine.llm:
+            prompt = f"Classify the following user message into one of: chat, summarize, plan, todo, search, generate_doc. Return only the intent.\nMessage:\n{message}"
+            try:
+                resp = self.engine._llm_generate(prompt, temperature=0.0)
+                # normalize
+                intent = resp.strip().split()[0].lower()
+                return {"intent": intent}
+            except Exception:
+                pass
+
+        return {"intent": "chat"}
+
+    def handle_message(self, session_id: str, message: str) -> Dict[str, Any]:
+        """Main conversational entrypoint. Appends to memory and routes to handlers."""
+        # store user message
+        self.memory.append_message(session_id, "user", message)
+
+        intent_info = self.parse_intent(message)
+        intent = intent_info.get("intent", "chat")
+
+        if intent == "summarize":
+            # extract text to summarize (simple heuristic)
+            summary = self.summarize_text(message)
+            self.memory.append_message(session_id, "agent", summary)
+            return {"intent": "summarize", "response": summary}
+
+        if intent == "plan":
+            # expect the message contains a goal and optional industry
+            # fallback: run pipeline with provided message as goal
+            result = self.engine.run_pipeline(message, industry="General Business")
+            out = result.get("strategy", "")
+            self.memory.append_message(session_id, "agent", out)
+            return {"intent": "plan", "response": out, "data": result}
+
+        if intent == "todo":
+            items = self.extract_action_items(message)
+            self.memory.append_message(session_id, "agent", items)
+            return {"intent": "todo", "response": items}
+
+        if intent == "search":
+            results = self.engine.search_web(message, max_results=5)
+            summary = self.engine._extract_industry_insights("General", results)
+            self.memory.append_message(session_id, "agent", summary)
+            return {"intent": "search", "response": summary, "sources": results}
+
+        if intent == "generate_doc":
+            # generate a strategy and create a document
+            result = self.engine.run_pipeline(message, industry="General Business")
+            filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.docx"
+            path = self.engine.generate_doc(result, filename)
+            resp = {"message": "Document generated", "path": path, "data": result}
+            self.memory.append_message(session_id, "agent", "Generated document: " + filename)
+            return {"intent": "generate_doc", "response": resp}
+
+        # default: chat using LLM
+        reply = self.chat_with_llm(session_id, message)
+        self.memory.append_message(session_id, "agent", reply)
+        return {"intent": "chat", "response": reply}
+
+    def chat_with_llm(self, session_id: str, message: str) -> str:
+        session = self.memory.get_session(session_id)
+        history = session.get("history", [])[-10:]
+        # build prompt
+        prompt_parts = [f"{m['role']}: {m['content']}" for m in history]
+        prompt_parts.append(f"user: {message}")
+        prompt = "\n".join(prompt_parts)
+
+        if self.engine.llm:
+            try:
+                resp = self.engine._llm_generate(prompt, temperature=0.7)
+                return resp
+            except Exception as e:
+                logger.warning(f"LLM chat failed: {str(e)}")
+
+        # fallback echo
+        return f"I heard: {message}. (Configure an LLM for richer responses)"
+
+    def summarize_text(self, text: str) -> str:
+        prompt = f"Summarize the following text in 3-5 sentences:\n\n{text}"
+        if self.engine.llm:
+            try:
+                return self.engine._llm_generate(prompt, temperature=0.3)
+            except Exception:
+                pass
+        # fallback simple summary
+        return (text[:800] + "...") if len(text) > 800 else text
+
+    def extract_action_items(self, text: str) -> str:
+        prompt = f"Extract 5 concrete action items from the following text:\n\n{text}"
+        if self.engine.llm:
+            try:
+                return self.engine._llm_generate(prompt, temperature=0.4)
+            except Exception:
+                pass
+        # fallback naive extraction: split by sentences
+        sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 10]
+        items = '\n'.join([f"{i+1}. {s[:200].strip()}" for i, s in enumerate(sentences[:5])])
+        return items
+

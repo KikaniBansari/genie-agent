@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
-from logic import GenieEngine
+from logic import GenieEngine, Agent
 import os
 import logging
 from datetime import datetime
@@ -33,6 +33,7 @@ app.add_middleware(
 
 # Initialize engine
 engine = GenieEngine()
+agent = Agent(engine)
 
 # Ensure outputs directory exists
 os.makedirs("outputs", exist_ok=True)
@@ -49,6 +50,21 @@ class FeedbackModel(BaseModel):
     request_id: str
     rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
     feedback: Optional[str] = Field(None, max_length=1000, description="Optional feedback text")
+
+
+class ChatRequest(BaseModel):
+    session_id: Optional[str] = Field(None, description="Session identifier for memory storage")
+    message: str = Field(..., min_length=1, description="User message to the agent")
+
+
+class MemoryActionModel(BaseModel):
+    session_id: str
+    action: str = Field(..., description="Action to perform: get, clear")
+
+
+class ActionRequest(BaseModel):
+    action: str = Field(..., description="Named action to execute, e.g., summarize, plan, search, generate_doc")
+    payload: Optional[dict] = None
 
 # Health Check
 @app.get("/")
@@ -141,6 +157,75 @@ async def process_request(req: RequestModel, background_tasks: BackgroundTasks):
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+
+
+@app.post("/api/chat")
+async def chat_endpoint(chat: ChatRequest):
+    """Conversational endpoint supporting session memory and intent routing."""
+    session_id = chat.session_id or f"sess_{os.urandom(4).hex()}"
+    try:
+        result = agent.handle_message(session_id, chat.message)
+        return {"status": "success", "session_id": session_id, "result": result}
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/memory")
+async def memory_action(mem: MemoryActionModel):
+    """Get or clear session memory."""
+    try:
+        if mem.action == "get":
+            session = agent.memory.get_session(mem.session_id)
+            return {"status": "success", "session": session}
+        if mem.action == "clear":
+            agent.memory.clear_session(mem.session_id)
+            return {"status": "success", "message": "session cleared"}
+        raise HTTPException(status_code=400, detail="Unknown memory action")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Memory error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/action")
+async def invoke_action(req: ActionRequest):
+    """Invoke a specific agent action programmatically."""
+    try:
+        action = req.action
+        payload = req.payload or {}
+
+        # route to agent methods
+        if action == "summarize":
+            text = payload.get("text", "")
+            return {"status": "success", "response": agent.summarize_text(text)}
+        if action == "plan":
+            goal = payload.get("goal", "")
+            industry = payload.get("industry", "General Business")
+            data = agent.engine.run_pipeline(goal, industry)
+            return {"status": "success", "data": data}
+        if action == "todo":
+            text = payload.get("text", "")
+            return {"status": "success", "response": agent.extract_action_items(text)}
+        if action == "search":
+            query = payload.get("query", "")
+            results = agent.engine.search_web(query)
+            return {"status": "success", "results": results}
+        if action == "generate_doc":
+            goal = payload.get("goal", "")
+            industry = payload.get("industry", "General Business")
+            result = agent.engine.run_pipeline(goal, industry)
+            filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(4).hex()}.docx"
+            path = agent.engine.generate_doc(result, filename)
+            return {"status": "success", "path": path, "data": result}
+
+        raise HTTPException(status_code=400, detail="Unknown action")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Action invocation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Batch Processing Endpoint
 @app.post("/api/process/batch")

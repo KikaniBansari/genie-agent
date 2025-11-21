@@ -249,6 +249,33 @@ Content-Type: application/json
 GET /api/analytics
 ```
 
+#### Conversational & Action Endpoints
+```http
+POST /api/chat
+Content-Type: application/json
+
+{
+  "session_id": "optional-session-id",
+  "message": "Please create a growth strategy for my bakery"
+}
+
+POST /api/memory
+Content-Type: application/json
+
+{
+  "session_id": "sess_abcd1234",
+  "action": "get"  # or "clear"
+}
+
+POST /api/action
+Content-Type: application/json
+
+{
+  "action": "summarize",
+  "payload": {"text": "Long text to summarize..."}
+}
+```
+
 ### Interactive API Documentation
 
 Visit `http://localhost:8000/docs` for interactive Swagger documentation.
